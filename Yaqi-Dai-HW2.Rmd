@@ -1,0 +1,401 @@
+---
+title: "Home Work 2"
+author: "Yaqi Dai"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 1
+## (a)
+
+$$\begin{split}L(\theta) &= \prod_{i = 1}^n p(x_i|\theta)\\
+l(\theta)&=lnL(\theta)=ln\prod_{i=1}^np(x_i|\theta)\\
+&=\sum_{i=1}^nln(p(x_i|\theta))\\
+&=\sum_{i=1}^nln\frac{1}{\pi[1+(\theta-x_i)^2]}\\
+&=0-\sum_{i=1}^nln\pi-\sum_{i=1}^nln[1+(\theta-x_i)^2]\\
+&=-nln\pi-\sum_{i=1}^nln[1+(\theta-x_i)^2]
+\end{split}$$
+
+
+$$\begin{split}l'(\theta)&=\frac{dl(\theta)}{d\theta}\\
+&=0-\sum_{i=1}^n\frac{2(\theta-x_i)}{1+(\theta-x_i)^2}\\
+&=-2\sum_{i=1}^n\frac{\theta-x_i}{1+(\theta-x_i)^2}
+\end{split}$$
+
+
+$$\begin{split}l''(\theta)&=-2\sum_{i=1}^n\frac{(\theta-x_i)'[1+(\theta-x_i)^2]-2(\theta-x_i)(\theta-x_i)}{[1+(\theta-x_i)^2]^2}\\
+&=-2\sum_{i=1}^n\frac{1+(\theta-x_i)^2-2(\theta-x_i)^2}{[1+(\theta-x_i)^2]^2}\\
+&=-2\sum_{i=1}^n\frac{1-(\theta-x_i)^2}{[1+(\theta-x_i)^2]^2}
+\end{split}$$
+
+Note $I(\theta)=nI_x(\theta)$
+
+
+$$\begin{split}I_x(\theta)&=E[(\frac{\partial}{\partial\theta}log(p(x;\theta)))^2]\\
+&=E[p'(x)^2]\\
+&=\int_{-\infty}^{+\infty}\frac{\lbrace p'(x)\rbrace ^2}{p(x)}{\rm d}x\\
+\\
+\\
+I_x(\theta)&=\int_{-\infty}^{+\infty}(\frac{2(x-\theta)}{1+(x-\theta)^2})^2\frac{1}{\pi(1+(x-\theta)^2)}{\rm d}x\\
+&=\frac{4}{\pi}\int_{-\infty}^{+\infty}\frac{(x-\theta)^2}{(1+(x-\theta)^2)^3}{\rm d}x\\
+&=\frac{4}{\pi}\int_{-\infty}^{+\infty}\frac{(x-\theta)^2}{(1+(x-\theta)^2)^3}{\rm d}(x-\theta)
+\end{split}$$
+
+
+Rewrite the equation:
+
+$$I_x(\theta)=\frac{4}{\pi}\int_{-\infty}^{+\infty}\frac{x^2}{(1+x^2)^3}{\rm d}x$$
+Now let $u=\frac{1}{1+x^2}$, then we can have $x=(\frac{1-u}{u})^\frac{1}{2}$, 
+${\rm d}x=-\frac{1}{2}(1-u)^{-\frac{1}{2}}u^{-\frac{3}{2}}{\rm d}u$
+
+$$\begin{split}I_x(\theta)&=\frac{8}{\pi}\int_{0}^{+\infty}\frac{x^2}{(1+x^2)^3}{\rm d}x\\
+&=\frac{8}{\pi}\int_1^0 \frac{1-u}{u}u^3(-\frac{1}{2})(1-u)^{-\frac{1}{2}}u^{-\frac{3}{2}}{\rm d}u\\
+&=\frac{4}{\pi}\int_0^1(1-u)^{\frac{1}{2}}u^{\frac{1}{2}}{\rm d}u\\
+&=\frac{4}{\pi}\int_0^1(1-u)^{\frac{3}{2}-1}u^{\frac{3}{2}-1}{\rm d}u\\
+&=\frac{4}{\pi}B(\frac{3}{2},\frac{3}{2})\\
+&=\frac{4}{\pi}\frac{\Gamma(\frac{3}{2})\Gamma(\frac{3}{2})}{\Gamma(3)}\\
+&=\frac{4}{\pi}\frac{\frac{1}{2}\sqrt{\pi}\frac{1}{2}\sqrt{\pi}}{2}\\
+&=\frac{1}{2}
+\end{split}$$
+
+As $I(\theta)=nI_x(\theta)$, we can have$$I(\theta)=n\int_{-\infty}^{+\infty}\frac{\lbrace p'(x)\rbrace ^2}{p(x)}{\rm d}x=\frac{4n}{\pi}\int_{-\infty}^{+\infty}\frac{x^2}{(1+x^2)^3}{\rm d}x=\frac{n}{2}$$
+
+
+## (b)
+Graph the log-likelihood function.
+
+```{r}
+Loglikelihood <- function(X, theta){
+  n <- length(X)
+  -n*log(pi) - sum(log(1 + (theta - X)^2))
+}
+X <- c(1.77, -0.23, 2.76, 3.80, 3.47, 56.75, -1.34, 4.24, -2.44,
+       3.29, 3.71, -2.40, 4.53, -0.07, -1.05, -13.87, -2.53, -1.75)
+theta <- seq(-20, 20, by = 0.01)
+loglikelihood <- sapply(theta, FUN=function(theta) Loglikelihood(X, theta))
+plot(theta, loglikelihood, type="l")
+
+```
+All MLE for $\theta$ using the Newton-Raphson method are in the following table.
+
+```{r}
+## function to calculate the MLE of Cauchy distribution by Newton-Raphson method
+NewtonMleCauchy <- function(X, a, tolar){
+  # X is vector of observed sample
+  # a is the start value
+  timestart <- Sys.time()
+  n <- length(X)
+  theta.iterate <- a
+  i <- 0 # i is the number of iteration
+  #calculate the first derivate of log likelyhood of Cauchy distribution
+  firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+  while(abs(firstd) > tolar ){
+    secondd <- (-2)*sum(((1 - (theta.iterate - X)^2)/(1 + (theta.iterate - X)^2))^2)
+    theta.new <- theta.iterate - firstd/secondd
+    theta.iterate <-theta.new
+    firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+    i <- i + 1
+  }
+  timeend <- Sys.time()
+  running.time <- timeend - timestart
+  result1 <- c(theta.iterate, running.time, i)
+  return(result1)
+}
+X <- c(1.77, -0.23, 2.76, 3.80, 3.47, 56.75, -1.34, 4.24, -2.44,
+       3.29, 3.71, -2.40, 4.53, -0.07, -1.05, -13.87, -2.53, -1.75)
+Y <- c(-11, -1, 0, 1.5, 4, 4.7, 7, 8, 38)
+
+## find MLE for theta
+mle.matrix <- sapply(Y, FUN = function(Y) NewtonMleCauchy(X, Y, 1E-10))
+
+## start at sample mean
+sample.mean <- mean(X)
+theta.sm <- NewtonMleCauchy(X, sample.mean, 1E-10)
+
+```
+
+
+```{r echo=FALSE}
+Result <- rbind(Y, mle.matrix)
+Result.table <- t(Result) 
+colnames(Result.table) <- c("**starting point**", "**MLE**", "**running time**", "**number of iterations**")
+knitr::kable(Result.table, align = 'c', caption = "result from Netown-Raphson method")
+```
+
+The sample mean is 3.25778, if we use sample mean as a start value, the MLE for $\theta$ is 3.0213454 and it iterates 117 times. The MLE for $\theta$ is the same as above and the number of interates is much lower. So I think the sample is a good starting point.
+
+## (c)
+When apply fixed-point iteration, use the 2000 as a maximum iteration number to be a limit.
+The main code for the function shows below.
+```{r}
+Fixedpoint <- function(alfa, a, totlar){
+  # a is the initial value of theta
+  timestart <- Sys.time()
+  theta.iterate <- a
+  firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+  theta.new <- theta.iterate + alfa*firstd
+  i <- 0
+  while (abs(firstd) > totlar && i <= 2000) {
+    theta.new <- theta.iterate + alfa*firstd
+    theta.iterate <- theta.new
+    firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+    i <- i + 1
+  }
+  timeend <- Sys.time()
+  runningtime <- timestart - timeend
+  result2 <- c(theta.iterate, runningtime, i)
+  return(result2)
+}
+```
+
+Then we can have the following result.
+```{r echo=FALSE}
+Fixedpoint <- function(alfa, a, totlar){
+  # a is the initial value of theta
+  timestart <- Sys.time()
+  theta.iterate <- a
+  firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+  theta.new <- theta.iterate + alfa*firstd
+  i <- 0
+  while (abs(firstd) > totlar && i <= 2000) {
+    theta.new <- theta.iterate + alfa*firstd
+    theta.iterate <- theta.new
+    firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+    i <- i + 1
+  }
+  timeend <- Sys.time()
+  runningtime <- timestart - timeend
+  result2 <- c(theta.iterate, runningtime, i)
+  return(result2)
+}
+
+X <- c(1.77, -0.23, 2.76, 3.80, 3.47, 56.75, -1.34, 4.24, -2.44,
+       3.29, 3.71, -2.40, 4.53, -0.07, -1.05, -13.87, -2.53, -1.75)
+Y <- c(-11, -1, 0, 1.5, 4, 4.7, 7, 8, 38)
+
+theta1 <- sapply(Y, FUN = function(Y)Fixedpoint(1, Y, 1E-10))
+theta2 <- sapply(Y, FUN = function(Y)Fixedpoint(0.64, Y, 1E-10))
+theta3 <- sapply(Y, FUN = function(Y)Fixedpoint(0.25, Y, 1E-10))
+
+Result1 <- t(rbind(Y, theta1))
+colnames(Result1) <- c("**starting point**", "**MLE**", "**running time**", 
+                       "**number of iterations**")
+knitr::kable(Result1, align = 'c', caption = "result for alpha= 1")
+
+Result2 <- t(rbind(Y, theta2))
+colnames(Result2) <- c("**starting point**", "**MLE**", "**running time**", 
+                       "**number of iterations**")
+knitr::kable(Result2, align = 'c', caption = "result for alpha= 0.64")
+
+Result3 <- t(rbind(Y, theta3))
+colnames(Result3) <- c("**starting point**", "**MLE**", "**running time**", 
+                       "**number of iterations**")
+knitr::kable(Result3, align = 'c', caption = "result for alpha= 0.25")
+```
+
+## (d)
+Main code of Fisher scoring and refine by Newton-Raphson. I only interate 20 times by Fisher-scoring method, then refine the result by Newto-Raphson method.
+```{r}
+## function to calculate the MLE of Cauchy distribution by Fisher scoring
+FisherScoring <- function(X, a, tolar){
+  # X is vector of observed sample
+  # a is the start value
+  n <- length(X)
+  fisherinfor <- n/2
+  theta.iterate <- a
+  #calculate the first derivate of log likelyhood of Cauchy distribution
+  firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+  i <- 0
+  while(abs(firstd) > tolar && i <= 20){
+    theta.new <- theta.iterate + firstd/fisherinfor
+    theta.iterate <-theta.new
+    firstd <- (-2)*sum((theta.iterate - X)/(1 + (theta.iterate - X)^2))
+    i <- i + 1
+  }
+  return(theta.iterate)
+}
+## use theta calculated from Fisher-scoring method as the initial value 
+## in the Newton-Raphson method
+
+NewtonFisher <- function(X, a, tolar){
+  theta.fisher <- FisherScoring(X, a, tolar)
+  theta.newton <- NewtonMleCauchy(X, theta.fisher, tolar)
+  return(theta.newton)
+}
+
+```
+
+Result from fisher-scoring and the refined result shows below.
+
+```{r echo=FALSE}
+## theta estimator at different initial value
+
+
+fisher.estimate <- matrix(sapply(Y, FUN = function(Y)FisherScoring(X, Y,tolar = 1E-10)))
+newton.estimate <- sapply(Y, FUN = function(Y)NewtonFisher(X, Y, tolar = 1E-10))
+Result.fisher <- cbind(Y,fisher.estimate,t(newton.estimate))
+colnames(Result.fisher) <- c("**starting point**", "**fisher estimate**", 
+                             "**refined MLE**", "**running time**", 
+                             "**number of iterations**")
+knitr::kable(Result.fisher, align = 'c', 
+             caption = "result from fisher-scoring and refined by Newton-Raphson method")
+```
+
+## (e)
+
+Newton-Raphson method is stable for different starting points. 
+Results from Fixed-point method rely on $\alpha$. If $\alpha$ is good, the speed for Fixed-point method is faster than other method, it will have the least iterate steps. But if $\alpha$ is not good enough, in the test above, it always connot have the result within 2000 iterate steps.
+If we use Fisher-scoring method to find MLE then refine the result by Newyon-Raphson method, it will need fewer steps to iterate. Actually, within in 20 iterate steps, many of the results above is really close to the refined MLE.
+
+# Problem 2
+## (a)
+Log-likelihood functions of $\theta$ based on sample is :
+$$\begin{split}L(\theta)&=\prod_{i = 1}^n p(x_i|\theta)\\
+l(\theta)&=\sum_{i=1}^{n}ln\frac{1-cos(x_i-\theta)}{2\pi}\\
+&=\sum_{i=1}^{n}(1-cos(x_i-\theta))-nln2\pi
+\end{split} $$
+
+Graph the function between $-\pi$ and $\pi$
+```{r}
+Loglikelihood <- function(X, theta){
+  n <- length(X)
+  sum(log(1 - cos(X - theta))) - n*log(2*pi)
+}
+
+X <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96,
+       2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52)
+theta <- seq(-pi, pi, by = 0.01)
+loglikelihood2 <- sapply(theta, FUN=function(theta) Loglikelihood(X, theta))
+plot(theta, loglikelihood2, type="l")
+```
+
+## (b)
+$$\begin{split}E[X|\theta]&=\int_{0}^{2\pi}xp(x|\theta){\rm d}x\\
+&=\int_{0}^{2\pi}\frac{x-xcos(x-\theta)}{2\pi}{\rm d}x\\
+&=\left.[\frac{x^2}{4\pi}-\frac{1}{2\pi}[xsin(x-\theta)+cos(x-\theta)]]\right|_{0}^{2\pi}\\
+&=\pi+sin\theta\\
+\\
+\overline{x}&=\pi+sin\theta\\
+\\
+\theta_0&=\hat{\theta}_{moment}=\arcsin(\overline{x}-\pi)\\
+&=0.095394067
+\end{split} $$
+
+## (c)
+Main code for Newton-Raphson method is:
+```{r}
+NewtonMethod <- function(X, a, tolar){
+  # X is vector of observed sample
+  # a is the start value
+  n <- length(X)
+  theta.iterate <- a
+  #calculate the first derivate of log likelyhood of Cauchy distribution
+  firstd <- sum(sin(X - theta.iterate)/(cos(X - theta.iterate) - 1))
+  while(abs(firstd) > tolar ){
+    secondd <- sum(1/(cos(X - theta.iterate) - 1))
+    theta.new <- theta.iterate - firstd/secondd
+    theta.iterate <-theta.new
+    firstd <- sum(sin(X - theta.iterate)/(cos(X - theta.iterate) - 1))
+  }
+  return(theta.iterate)
+}
+```
+
+MLE for $\theta$ using Newton-Raphson method with $\theta_0=\hat{\theta}_{moment}$ is 0.003118157.
+
+## (d)
+$\theta_0=-2.7$, MLE for $\theta$ is -2.668857.
+$\theta_0=2.7$, MLE for $\theta$ is 2.848415.
+
+## (e)
+We can use it devied the set into 18 sets.
+
+Main code for (e) is :
+```{r}
+initialvalue <- seq(-pi, pi, length.out = 200)
+theta.set <- round(sapply(initialvalue, 
+                          FUN = function(initialvalue)
+                            NewtonMethod(X, initialvalue, 1E-10)), 4)
+theta.list <- split(initialvalue, theta.set)
+list(theta.list)
+```
+
+# problem 3
+## (a)
+Main code for fit the population growth shows below:
+```{r warning=FALSE}
+beetles <- data.frame(
+  days <- c(0, 8, 28, 41, 63, 69, 97, 117, 135, 154),
+  nbeetles <- c(2, 47, 192, 256, 768, 896, 1120, 896, 1184, 1024)
+)
+K <- 1500
+r1 <- log(beetles$nbeetles*(K - 2)/(K - beetles$nbeetles)*2)
+r2 <- r1 / beetles$days....c.0..8..28..41..63..69..97..117..135..154.
+r.mean <- mean(r2[2: 10])
+N0 <- beetles[1,2]
+
+nls(nbeetles ~ (K*N0)/(N0 + (K - N0)*exp(-r*days)),
+    start = list(K = 1500, r = r.mean), data = beetles, trace = TRUE)
+```
+
+We can the optimized value of K and r to be 1049.4068 and 0.1183
+
+## (b)
+Counter plot of the sum of squared errors(SSE) is:
+```{r}
+K1 <- seq(500, 1500, length.out = 200)
+r1 <- seq(0.1, 0.2, length.out = 200)
+
+n.beetles <- as.numeric(beetles$nbeetles....c.2..47..192..256..768..896..1120..896..1184..1024.)
+n.days <- as.numeric(beetles$days....c.0..8..28..41..63..69..97..117..135..154.)
+
+SSE <- function(K1, r1){
+  error.sq <- sum((n.beetles - (N0*K1)/(N0 + (K1 - N0)*exp(-r1*n.days)))^2)
+  return(error.sq)
+}
+
+matrix.a <- matrix(nrow = 200, ncol = 200)
+
+for(i in 1:200){
+  for(j in 1:200){
+    matrix.a[i, j] <- SSE(K1[i], r1[j])
+  }
+}
+
+filled.contour(K1, r1, matrix.a, plot.title = title(main = "Contour plot of the sum squared errors", 
+                                                    xlab = "K", ylab = "r"),
+               key.title = title(main = "SSE"))
+```
+
+## (c)
+```{r warning=FALSE}
+nloglikelihood.c <- function(theta, N, days){
+  K <- theta[1]
+  r <- theta[2]
+  sigma <- theta[3]
+  t <- days
+  mu <- log((K*N0)/(2 + (K - N0)*exp(-r*t)))
+  theta.iterate <- (- sum(dnorm(log(N), mu, sigma, log = TRUE)))
+}
+
+
+sq <- sqrt(var(log(beetles$nbeetles)))
+
+theta0 <- c(K, r.mean, sq)
+mle <- nlm(nloglikelihood.c, theta0, N = beetles$nbeetles,days = beetles$days,hessian = TRUE)
+estimate <- mle$estimate
+estimate
+matrix.hessian <- mle$hessian
+matrix.hessian
+variance <- solve(matrix.hessian)
+variance
+diag(variance)
+
+```
+The estimate values are $$(K,r,\sigma)=(820.3814175, 0.1926394, 0.6440835) $$ and the varance of the parameters are $$(var(K), var(r), var(\sigma))=( 6.262775*10^4, 4.006728*10^{-3},2.075822*10^{-2}) $$
